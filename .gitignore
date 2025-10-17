@@ -4,6 +4,9 @@
 # .env 파일 무시
 *.env
 
+# .sql 파일 무시
+*.sql
+
 ### Node ###
 # Logs
 logs
