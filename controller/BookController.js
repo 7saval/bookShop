@@ -5,50 +5,56 @@ const {StatusCodes} = require('http-status-codes');     // status code 모듈
 // const dotenv = require('dotenv');       // dotenv 모듈
 // dotenv.config();
 
-
+// (카테고리별, 신간 여부) 전체 도서 목록 조회
 const allBooks = (req, res)=>{
-    // req.query.categryId
-    let {category_id} = req.query;
+    let {category_id, news, limit, currentPage } = req.query;
 
-    if(category_id){
-        // 카테고리별 도서 목록 조회
-        let sql = `SELECT * FROM books WHERE category_id = ?`;
-        // SELECT 쿼리문
-        conn.query(sql, category_id,
-            (err, results) => {
-                if(err){
-                    console.log(err)
-                    return res.status(StatusCodes.BAD_REQUEST).end()
-                }
+    // limit : page당 도서 수   ex. 3
+    // currentPage : 현재 몇 페이지 ex. 1, 2, 3 ...
+    // offset : limit*(currentPage-1)  ex. 0, 3, 6, 9, 12 ...
 
-                if(results.length > 0)
-                    return res.status(StatusCodes.OK).json(results);
-                else
-                    return res.status(StatusCodes.NOT_FOUND).end();
-            }
-        )
-    }else{
-        // (요약된) 전체 도서 리스트
-        let sql = `SELECT * FROM books`;
-        // SELECT 쿼리문
-        conn.query(sql,
-            (err, results) => {
-                if(err){
-                    console.log(err)
-                    return res.status(StatusCodes.BAD_REQUEST).end()
-                }
+    let offset = limit * (currentPage - 1);
 
-                res.status(StatusCodes.OK).json(results);
-            }
-        )
+    let sql = `SELECT * FROM books`;
+    let values = [];
+    // 순서 중요
+    if(category_id && news){
+        sql += ` WHERE category_id = ? AND pub_date BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()`;
+        values = [category_id];
+    } else if(category_id){
+        sql += ` WHERE category_id = ?`;
+        values = [category_id];
+    } else if(news){
+        sql += ` WHERE pub_date BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()`;
     }
+
+    // limit문은 where절 뒤에 붙어야 한다.
+    sql += ` LIMIT ? OFFSET ?`;
+    values = [...values, parseInt(limit), offset];
+ 
+    // SELECT 쿼리문
+    conn.query(sql, values,
+        (err, results) => {
+            if(err){
+                console.log(err)
+                return res.status(StatusCodes.BAD_REQUEST).end()
+            }
+
+            if(results.length > 0)
+                return res.status(StatusCodes.OK).json(results);
+            else
+                return res.status(StatusCodes.NOT_FOUND).end();
+        }
+    )
 }
 
+// 개별 도서 상세 조회
 const bookDetail = (req, res)=>{
     let {id} = req.params;
     id = parseInt(id);
 
-    let sql = `SELECT * FROM books WHERE id = ?`;
+    let sql = `SELECT * FROM books LEFT JOIN category 
+                    ON books.category_id = category.id WHERE books.id = ?`;
     // SELECT 쿼리문
     conn.query(sql, id,
         (err, results) => {
@@ -65,29 +71,7 @@ const bookDetail = (req, res)=>{
     )
 }
 
-// const booksByCategory = (req, res)=>{
-//     // req.query.categryId
-//     let {category_id} = req.query;
-
-//     let sql = `SELECT * FROM books WHERE category_id = ?`;
-//     // SELECT 쿼리문
-//     conn.query(sql, category_id,
-//         (err, results) => {
-//             if(err){
-//                 console.log(err)
-//                 return res.status(StatusCodes.BAD_REQUEST).end()
-//             }
-
-//             if(results.length > 0)
-//                 return res.status(StatusCodes.OK).json(results);
-//             else
-//                 return res.status(StatusCodes.NOT_FOUND).end();
-//         }
-//     )
-// }
-
 module.exports = {
     allBooks,
-    bookDetail,
-    // booksByCategory
+    bookDetail
 }
