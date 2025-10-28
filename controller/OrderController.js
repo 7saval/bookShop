@@ -1,46 +1,66 @@
-const conn = require('../mariadb')  // db 모듈 가져오기
+// const conn = require('../mariadb')  // db 모듈 가져오기
+const mysql = require('mysql2/promise');  // 쿼리를 promise로 감싸기
+
 const {StatusCodes} = require('http-status-codes');     // status code 모듈
 
 // 주문하기
-const order = (req, res)=>{
+const order = async (req, res)=>{
+    const conn = await mysql.createConnection({
+        host: '127.0.0.1',
+        port: '3307',
+        user: 'root',
+        password: 'root',
+        database: 'Bookshop',
+        dateStrings: true,    // 날짜 형식대로 표기
+      });
+
     const {items, delivery, totalQuantity, totalPrice, userId, repBookTitle} = req.body;
 
-    let delivery_id = 2;
-    let order_id = 2;
     // 배송 정보
     let sql = `INSERT INTO delivery (address, receiver, contact) VALUES (?, ?, ?)`;
     // const delivery_id = SELECT max(id) FROM delivery;
     let values = [delivery.address, delivery.receiver, delivery.contact];
     // INSERT 쿼리문
-    // conn.query(sql, values,
-    //     function (err, results) {
-    //         if(err){
-    //             console.log(err)
-    //             return res.status(StatusCodes.BAD_REQUEST).end();   // Bad Request(400)
-    //         }
+    let [results] = await conn.execute(sql, values
+        // function (err, results) {
+        //     if(err){
+        //         console.log(err)
+        //         return res.status(StatusCodes.BAD_REQUEST).end();   // Bad Request(400)
+        //     }
 
-    //         delivery_id = results.insertId; // 생성 PK id
+        //     delivery_id = results.insertId; // 생성 PK id
 
-    //         return res.status(StatusCodes.CREATED).json(results);  // 201
-    //     }
-    // );
+        //     // return res.status(StatusCodes.CREATED).json(results);  // 201
+        // }
+    );
 
+    console.log(results);
+
+    let delivery_id = results.insertId;
+    
     // 주문 정보
     sql = `INSERT INTO orders (rep_book_title, total_quantity, total_price, user_id, delivery_id) 
                 VALUES (?, ?, ?, ?, ?);`;
     values = [repBookTitle, totalQuantity, totalPrice, userId, delivery_id];
-    // conn.query(sql, values,
-    //     function (err, results) {
-    //         if(err){
-    //             console.log(err)
-    //             return res.status(StatusCodes.BAD_REQUEST).end();   // Bad Request(400)
-    //         }
+    [results] = await conn.execute(sql, values
+        // function (err, results) {
+        //     if(err){
+        //         console.log(err)
+        //         return res.status(StatusCodes.BAD_REQUEST).end();   // Bad Request(400)
+        //     }
 
-    //         order_id = results.insertId; // 생성 PK id
+        //     order_id = results.insertId; // 생성 PK id
 
-    //         return res.status(StatusCodes.CREATED).json(results);  // 201
-    //     }
-    // );
+        //     // return res.status(StatusCodes.CREATED).json(results);  // 201
+        // }
+    );
+
+    let order_id = results.insertId;
+
+    // items를 가지고, 장바구니에서 book_id, quantity 조회
+    sql = `SELECT book_id, quantity FROM cartItems WHERE id IN (?)`;
+    // let orderItems = await conn.query(sql, [items]);
+    let [orderItems, fields] = await conn.query(sql, [items]);
 
     // 주문한 책
     sql = `INSERT INTO orderedBook (order_id, book_id, quantity)
@@ -48,29 +68,84 @@ const order = (req, res)=>{
             
     // items.. 배열 : 요소들을 하나씩 꺼내서 (foreach문 돌려서)
     values = [];    // 초기화
-    items.forEach((item) => {
+    // items.forEach((item) => {
+    //     values.push([order_id, item.book_id, item.quantity]);
+    // });
+    orderItems.forEach((item) => {
         values.push([order_id, item.book_id, item.quantity]);
     });
     
-    conn.query(sql, [values],
-        function (err, results) {
-            if(err){
-                console.log(err)
-                return res.status(StatusCodes.BAD_REQUEST).end();   // Bad Request(400)
-            }
+    results = await conn.query(sql, [values]
+        // function (err, results) {
+        //     if(err){
+        //         console.log(err)
+        //         return res.status(StatusCodes.BAD_REQUEST).end();   // Bad Request(400)
+        //     }
 
-            return res.status(StatusCodes.CREATED).json(results);  // 201
-        }
+            // return res.status(StatusCodes.CREATED).json(results);  // 201
+        // }
     );
+
+    // 결제한 장바구니 삭제
+    let result = await delCartItems(conn, items);
+    return res.status(StatusCodes.CREATED).json(results[0]);  // 201
     
 }
 
-const getOrders = (req, res)=>{
-    res.json('주문목록 조회');
+// 결제한 장바구니 삭제
+const delCartItems = async (conn, items) => {
+    let sql = `DELETE FROM cartItems WHERE id IN (?)`;
+
+    let result = await conn.query(sql, [items]);
+    return result;
 }
 
-const getOrderDetail = (req, res)=>{
-    res.json('주문 상세 상품 조회');
+// 주문내역 조회
+const getOrders = async (req, res)=>{
+    // DB connection 생성
+    const conn = await mysql.createConnection({
+        host: '127.0.0.1',
+        port: '3307',
+        user: 'root',
+        password: 'root',
+        database: 'Bookshop',
+        dateStrings: true,    // 날짜 형식대로 표기
+      });
+
+    // 주문내역 페이지에서 보여줄 컬럼 셋팅 위해 orders와 delivery 조인
+    let sql = `SELECT orders.id, created_at, address, receiver, contact, 
+                    rep_book_title, total_quantity, total_price
+                FROM orders LEFT JOIN delivery 
+                ON orders.delivery_id = delivery.id`;
+
+    let [rows, fields] = await conn.query(sql);
+    return res.status(StatusCodes.OK).json(rows);
+}
+
+// 주문상세 조회
+const getOrderDetail = async (req, res)=>{
+    // 상세 조회할 주문id url로 받아오기
+    let {id} = req.params;
+    id = parseInt(id);
+
+    // DB connection 생성
+    const conn = await mysql.createConnection({
+        host: '127.0.0.1',
+        port: '3307',
+        user: 'root',
+        password: 'root',
+        database: 'Bookshop',
+        dateStrings: true,    // 날짜 형식대로 표기
+      });
+
+    // orderedBook과 books 조인
+    let sql = `SELECT book_id, title, author, price, quantity
+                FROM orderedBook LEFT JOIN books 
+                ON orderedBook.book_id = books.id
+                WHERE order_id = ?`;
+
+    let [rows, fields] = await conn.query(sql, id);
+    return res.status(StatusCodes.OK).json(rows);
 }
 
 module.exports = {

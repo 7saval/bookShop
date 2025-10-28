@@ -1,7 +1,20 @@
 // mysql 모듈 소환
-const mysql = require('mysql2');
+const mysql = require('mysql2');  // 쿼리를 promise로 감싸기
 
 // DB와 연결 통로 생성
+// const connection = async () => {
+//   const conn = await mysql.createConnection({
+//     host: '127.0.0.1',
+//     port: '3307',
+//     user: 'root',
+//     password: 'root',
+//     database: 'Bookshop',
+//     dateStrings: true,    // 날짜 형식대로 표기
+//   });
+
+//   return conn;
+// }
+
 const connection = mysql.createConnection({
   host: '127.0.0.1',
   port: '3307',
