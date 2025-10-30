@@ -31,7 +31,10 @@ const join = (req, res)=>{
                     return res.status(StatusCodes.BAD_REQUEST).end();   // Bad Request(400)
                 }
 
-                return res.status(StatusCodes.CREATED).json(results);  // 201
+                if(results.affectedRows)
+                    return res.status(StatusCodes.CREATED).json(results);  // 201
+                else
+                    return res.status(StatusCodes.BAD_REQUEST).end();
             }
         );
 };
@@ -57,6 +60,7 @@ const login = (req,res)=>{
             if(loginUser && loginUser.password === hashPassword){
                 // token 발급 / 유효기간 설정
                 const token = jwt.sign({
+                    id : loginUser.id,
                     email : loginUser.email
                 }, process.env.PRIVATE_KEY, {
                     expiresIn : '30m',  // 유효시간
