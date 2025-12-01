@@ -1,5 +1,6 @@
 // express 모듈 셋팅
 const express = require('express');
+const cors = require('cors');
 const app = express();
 
 // dotenv 모듈
@@ -11,6 +12,11 @@ app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 });
 
+// cors 셋팅
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true,
+}));
 
 const userRouter = require('./routes/users');
 const bookRouter = require('./routes/books');

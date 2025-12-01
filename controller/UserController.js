@@ -73,7 +73,8 @@ const login = (req,res)=>{
                 });
                 console.log(token);
 
-                res.status(StatusCodes.OK).json(results);
+                // res.status(StatusCodes.OK).json(results);
+                res.status(StatusCodes.OK).json({...results[0], token: token});
             }
             else{
                 res.status(StatusCodes.UNAUTHORIZED).json({  // 401 : Unauthorized(비인증) 403 : Forbidden(접근 권리 없음)

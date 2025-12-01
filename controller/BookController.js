@@ -49,41 +49,39 @@ const allBooks = (req, res)=>{
             }
 
             console.log(results);
-            if(results.length){
-                // pub_date => pubDate 변경
-                results.map((result)=> {
-                    result.pubDate = result.pub_date;
-                    delete result.pub_date;
-                });
-                allBooksRes.books = results;
-            } else{
+            if(!results.length){
                 return res.status(StatusCodes.NOT_FOUND).end();
             }
+            
+            // pub_date => pubDate 변경
+            results.map((result)=> {
+                result.pubDate = result.pub_date;
+                delete result.pub_date;
+            });
+            allBooksRes.books = results;
+
+            // 첫 번째 쿼리 성공 후 두 번째 쿼리 실행
+            // SELECT found_rows() : 저장된 총 ROW수 조회
+            let sql2 = ` SELECT found_rows()`;
+            conn.query(sql2,
+                (err, results2) => {
+                    if(err){
+                        console.log(err)
+                        return res.status(StatusCodes.BAD_REQUEST).end()
+                    }
+
+                    // pagination 객체 생성해 넣기
+                    let pagination = {};
+                    pagination.currentPage = parseInt(currentPage);
+                    pagination.totalCount = results2[0]["found_rows()"];
+
+                    allBooksRes.pagination = pagination;
+
+                    return res.status(StatusCodes.OK).json(allBooksRes);
+                }
+            )
         }
     )
-
-    // SELECT found_rows() : 저장된 총 ROW수 조회
-    sql = ` SELECT found_rows()`;
-    // sql = ` SELECT found_rows() AS foundRows`;
-    conn.query(sql,
-        (err, results) => {
-            if(err){
-                console.log(err)
-                return res.status(StatusCodes.BAD_REQUEST).end()
-            }
-
-            // pagination 객체 생성해 넣기
-            let pagination = {};
-            pagination.currentPage = parseInt(currentPage);
-            pagination.totalCount = results[0]["found_rows()"];
-
-            allBooksRes.pagination = pagination;
-
-            return res.status(StatusCodes.OK).json(allBooksRes);
-        }
-    )
-
-    
 }
 
 // 개별 도서 상세 조회
